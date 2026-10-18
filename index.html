@@ -173,15 +173,20 @@ code{background:var(--bg);padding:1px 6px;border-radius:4px;border:1px solid var
     </details>
 
     <details>
-      <summary>Käyttöönotto-ohjeet</summary>
+      <summary>YouTube-avaimen käyttöönotto</summary>
       <ol>
-        <li><b>YouTube-avain:</b> mene osoitteeseen <code>console.cloud.google.com</code>, luo uusi projekti, ota käyttöön <i>YouTube Data API v3</i> (APIs &amp; Services → Library) ja luo avain kohdassa Credentials → Create credentials → API key. Liitä avain yllä olevaan kenttään. Ilmainen kiintiö riittää noin 100 biisihakuun päivässä. Löydetyt videot muistetaan, joten sama biisi ei kuluta kiintiötä uudestaan.</li>
-        <li><b>Pelin osoite:</b> YouTuben soitin ei toimi, jos tämä tiedosto avataan suoraan koneelta (osoite alkaa <code>file://</code>). Helpoin ilmainen tapa on GitHub Pages: luo GitHubiin uusi julkinen repo, lataa tämä tiedosto sinne nimellä <code>index.html</code> ja ota käyttöön Settings → Pages → Branch: main. Peli aukeaa osoitteesta <code>käyttäjänimi.github.io/reponimi</code>.</li>
-        <li><b>Suojaa avain:</b> rajaa avain Google Cloudissa kohdassa Application restrictions → Websites osoitteeseen <code>https://käyttäjänimi.github.io/*</code>, niin muut eivät voi käyttää sitä.</li>
-        <li><b>Premium:</b> kirjaudu samassa selaimessa YouTubeen Premium-tililläsi, niin mainokset eivät keskeytä kierroksia.</li>
-        <li><b>Televisioon:</b> Androidissa avaa Google Home → Chromecast → Cast my screen. Laita Älä häiritse päälle äläkä vedä ilmoituspalkkia alas kierroksen aikana, koska mediaohjain näyttää videon nimen.</li>
-        <li><b>Jos biisi ei ala soida</b> puhelimella, napauta verhoa. Video pysyy piilossa.</li>
+        <li>Avaa <code>console.cloud.google.com</code> ja luo uusi projekti.</li>
+        <li>Valitse APIs &amp; Services → Library, hae <i>YouTube Data API v3</i> ja paina Enable.</li>
+        <li>Valitse Credentials → Create credentials → API key.</li>
+        <li>Avaa luotu avain ja rajaa se:
+          <ul>
+            <li>Application restrictions → Websites → lisää <code id="siteAddr">tämän sivun osoite</code></li>
+            <li>API restrictions → Restrict key → valitse vain YouTube Data API v3</li>
+          </ul>
+          Paina Save. Rajaus voi tulla voimaan vasta noin 5 minuutin päästä.</li>
+        <li>Kopioi avain ja liitä se yllä olevaan kenttään. Avain tallentuu vain tähän selaimeen.</li>
       </ol>
+      <p class="sub">Avain on ilmainen, eikä siitä tule laskua. Se riittää noin 100 biisihakuun päivässä, ja löydetyt biisit muistetaan. Kirjaudu YouTubeen samassa selaimessa, niin Premium pitää mainokset poissa.</p>
     </details>
   </section>
 
@@ -393,8 +398,9 @@ function updateStartInfo(){
   if(!apiKey) $('#keyBox').open=true;
 }
 function checkProtocol(){
+  if(location.protocol.startsWith('http')){const el=$('#siteAddr');if(el)el.textContent=location.origin+'/*'}
   if(location.protocol==='file:'){
-    $('#warn').innerHTML='<div class="msg">Avasit pelin suoraan tiedostona. YouTuben soitin ei yleensä toimi näin. Laita peli GitHub Pagesiin, ohjeet alla kohdassa Käyttöönotto-ohjeet.</div>';
+    $('#warn').innerHTML='<div class="msg">Avasit pelin suoraan tiedostona. YouTuben soitin ei yleensä toimi näin. Avaa peli verkko-osoitteen kautta.</div>';
   }
 }
 
