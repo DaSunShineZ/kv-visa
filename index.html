@@ -164,7 +164,21 @@ code{background:var(--bg);padding:1px 6px;border-radius:4px;border:1px solid var
     </details>
 
     <details>
-      <summary>Omat listat</summary>
+      <summary>Omat YouTube-soittolistat</summary>
+      <p class="sub">Soita biisejä omalta YouTube- tai YouTube Music -soittolistaltasi. Tähän ei tarvita avainta.</p>
+      <ol style="margin:0;padding-left:20px">
+        <li>Tee soittolista YouTubessa tai YouTube Musicissa.</li>
+        <li>Aseta näkyvyydeksi <b>Julkinen</b> tai <b>Listaamaton</b>. Yksityisiä listoja peli ei pysty soittamaan.</li>
+        <li>Valitse listalla Jaa → Kopioi linkki ja liitä se alle.</li>
+      </ol>
+      <label class="f">Listan nimi <input id="yName" type="text" placeholder="Esim. Meidän bilebiisit"></label>
+      <label class="f">Soittolistan linkki <input id="yUrl" type="text" placeholder="https://music.youtube.com/playlist?list=..." autocomplete="off" spellcheck="false"></label>
+      <div class="row"><button id="ySave">Tallenna soittolista</button><span id="yMsg" class="sub" style="margin:0"></span></div>
+      <p class="sub" style="margin:0">Vastauksena näytetään videon nimi ja kanava YouTubesta. Peli lukee listalta enintään noin 200 ensimmäistä biisiä.</p>
+    </details>
+
+    <details>
+      <summary>Omat tekstilistat</summary>
       <p class="sub">Liitä lista, yksi biisi per rivi muodossa <code>Bändi - Biisi - Vuosi</code>. Vuosi on vapaaehtoinen. Pyydä Claudelta uusi genre tässä muodossa ja liitä se tähän.</p>
       <label class="f">Listan nimi <input id="cName" type="text" placeholder="Esim. Suomimetalli 2000"></label>
       <label class="f">Biisit <textarea id="cText" placeholder="Nightwish - Nemo - 2004&#10;Children of Bodom - Hate Me! - 2000"></textarea></label>
@@ -350,9 +364,10 @@ function renderCats(){
   if(!cats[settings.cat]) settings.cat='m1990';
   $('#cats').innerHTML = Object.entries(cats).map(([id,c])=>{
     const played=(ls.get('played.'+id,[])).length;
-    return `<button class="cat" data-id="${id}" aria-pressed="${id===settings.cat}"><b>${esc(c.name)}</b><small>${esc(c.desc||'Oma lista')} · ${c.songs.length} biisiä${played?` · ${played} soitettu`:''}</small></button>`;
+    const size=c.type==='yt'?'ei vaadi avainta':`${c.songs.length} biisiä`;
+    return `<button class="cat" data-id="${id}" aria-pressed="${id===settings.cat}"><b>${esc(c.name)}</b><small>${esc(c.desc||'Oma lista')} · ${size}${played?` · ${played} soitettu`:''}</small></button>`;
   }).join('');
-  $('#cats').querySelectorAll('.cat').forEach(b=>b.onclick=()=>{settings.cat=b.dataset.id;save();renderCats()});
+  $('#cats').querySelectorAll('.cat').forEach(b=>b.onclick=()=>{settings.cat=b.dataset.id;save();renderCats();updateStartInfo()});
 }
 function renderPlayers(){
   $('#plist').innerHTML = settings.players.map((p,i)=>`<div class="row"><input id="pl${i}" value="${esc(p)}" aria-label="Pelaajan ${i+1} nimi"><button class="ghost" data-del="${i}" ${settings.players.length<2?'disabled':''} aria-label="Poista pelaaja">Poista</button></div>`).join('');
@@ -373,6 +388,19 @@ function bindSettings(){
   $('#addP').onclick=()=>{settings.players.push('Pelaaja '+(settings.players.length+1));save();renderPlayers()};
   $('#resetPlayed').onclick=()=>{Object.keys(allCats()).forEach(id=>ls.set('played.'+id,[]));renderCats()};
   $('#clearCache').onclick=()=>{vcache={};ls.set('vcache',vcache);updateCacheInfo()};
+  $('#ySave').onclick=()=>{
+    const name=$('#yName').value.trim();const raw=$('#yUrl').value.trim();
+    let listId='';
+    const m=raw.match(/[?&]list=([A-Za-z0-9_-]+)/);
+    if(m) listId=m[1]; else if(/^[A-Za-z0-9_-]{10,}$/.test(raw)) listId=raw;
+    if(!name){$('#yMsg').textContent='Anna listalle nimi.';return}
+    if(!listId){$('#yMsg').textContent='Linkistä ei löytynyt soittolistaa. Linkissä pitää olla kohta list=…';return}
+    const id='y_'+listId;
+    customs[id]={name,desc:'YouTube-soittolista',type:'yt',listId,songs:[]};ls.set('customs',customs);
+    settings.cat=id;save();
+    $('#yMsg').textContent='Tallennettu. Lista on valittuna ylhäällä.';$('#yName').value='';$('#yUrl').value='';
+    renderCustoms();renderCats();updateStartInfo();
+  };
   $('#cSave').onclick=()=>{
     const name=$('#cName').value.trim();
     const songs=$('#cText').value.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{
@@ -391,11 +419,13 @@ function bindSettings(){
   };
 }
 function updateCacheInfo(){$('#cacheInfo').textContent=`Videomuistissa ${Object.keys(vcache).length} biisiä.`}
+function needsKey(){const c=allCats()[settings.cat];return !(c&&c.type==='yt')}
 function updateStartInfo(){
-  $('#startInfo').textContent = apiKey?'':'Lisää ensin YouTube-avain alta.';
-  $('#startBtn').disabled=!apiKey;
+  const blocked=needsKey()&&!apiKey;
+  $('#startInfo').textContent = blocked?'Tämä lista tarvitsee YouTube-avaimen. Lisää se alta tai valitse oma YouTube-soittolista.':'';
+  $('#startBtn').disabled=blocked;
   $('#keyState').textContent = apiKey?`Avain tallennettu tähän selaimeen (päättyy …${apiKey.slice(-4)}).`:'';
-  if(!apiKey) $('#keyBox').open=true;
+  if(blocked) $('#keyBox').open=true;
 }
 function checkProtocol(){
   if(location.protocol.startsWith('http')){const el=$('#siteAddr');if(el)el.textContent=location.origin+'/*'}
@@ -422,6 +452,26 @@ function makePlayer(){
 }
 
 const key=s=>(s[0]+'|'+s[1]).toLowerCase();
+const itemKey=it=>it.vid?('yt:'+it.vid):key(it.song);
+const label=it=>it.song?`${it.song[0]} - ${it.song[1]}`:'Soittolistan biisi';
+function parseVideo(d){
+  let artist=(d&&d.author)||'', title=(d&&d.title)||'';
+  title=title.replace(/\s*[\(\[][^\)\]]*(official|video|audio|lyric|visuali[sz]er|hd|4k|remaster|live)[^\)\]]*[\)\]]/gi,'').trim();
+  if(/\s-\sTopic$/.test(artist)) artist=artist.replace(/\s-\sTopic$/,'');
+  else if(/\s[-–—]\s/.test(title)){const parts=title.split(/\s[-–—]\s/);artist=parts.shift();title=parts.join(' - ')}
+  else artist=artist.replace(/VEVO$/i,'').replace(/\s*official$/i,'');
+  return [artist.trim(),title.trim(),''];
+}
+function loadPlaylistIds(listId){
+  return new Promise((res,rej)=>{
+    let done=false,iv,to;
+    const fin=(f,v)=>{if(done)return;done=true;G.cueWait=null;clearInterval(iv);clearTimeout(to);f(v)};
+    G.cueWait={fail:()=>fin(rej,new Error('Soittolistaa ei voitu avata. Tarkista, että lista on julkinen tai listaamaton ja linkki on oikein.'))};
+    player.cuePlaylist({list:listId,listType:'playlist',index:0});
+    iv=setInterval(()=>{const ids=player.getPlaylist&&player.getPlaylist();if(ids&&ids.length)fin(res,ids.slice())},300);
+    to=setTimeout(()=>G.cueWait&&G.cueWait.fail(),12000);
+  });
+}
 async function searchVideos(song){
   const k=key(song);
   if(vcache[k]) return [vcache[k]];
@@ -445,11 +495,14 @@ function newGame(){
   const cat=allCats()[settings.cat];
   const names=settings.players.map(n=>n.trim()).filter(Boolean);
   if(names.length===0){names.push('Pelaaja 1')}
-  let played=ls.get('played.'+settings.cat,[]);
-  let pool=cat.songs.filter(s=>!played.includes(key(s)));
-  if(pool.length<settings.count){played=[];ls.set('played.'+settings.cat,[]);pool=cat.songs.slice()}
-  pool=shuffle(pool).slice(0,settings.count);
-  G={cat,catId:settings.cat,players:names.map(n=>({name:n,score:0})),queue:pool.map(s=>({song:s,cands:null,ci:0})),idx:-1,history:[],marks:{},phase:'idle',startAt:0,pendingClip:0,clipEnd:null,clipTotal:0};
+  const items=cat.type==='yt'?[]:cat.songs.map(s=>({song:s,cands:null,ci:0}));
+  G={cat,catId:settings.cat,players:names.map(n=>({name:n,score:0})),queue:pickQueue(items,settings.cat),idx:-1,history:[],marks:{},phase:'idle',startAt:0,pendingClip:0,clipEnd:null,clipTotal:0};
+}
+function pickQueue(items,catId){
+  let played=ls.get('played.'+catId,[]);
+  let pool=items.filter(it=>!played.includes(itemKey(it)));
+  if(pool.length<settings.count){ls.set('played.'+catId,[]);pool=items.slice()}
+  return shuffle(pool).slice(0,settings.count);
 }
 function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
 function cur(){return G.queue[G.idx]}
@@ -474,6 +527,17 @@ async function startGame(){
   msg('');
   await whenYT();
   await makePlayer();
+  if(G.cat.type==='yt'){
+    $('#gNum').textContent='Avataan soittolistaa…';$('#ctext').textContent='Luetaan soittolistaa…';
+    G.phase='loading';setBtns();
+    try{
+      const ids=await loadPlaylistIds(G.cat.listId);
+      G.queue=pickQueue(ids.map(v=>({vid:v,song:null,cands:[v],ci:0})),G.catId);
+    }catch(e){
+      msg(e.message);$('#gNum').textContent='Soittolista ei auennut';$('#ctext').textContent='Palaa asetuksiin Lopeta-napista';
+      return;
+    }
+  }
   nextSong();
 }
 
@@ -507,7 +571,7 @@ async function play(){
   if(G.phase==='idle'){
     G.phase='loading';setBtns();$('#ctext').textContent='Haetaan biisiä…';msg('');
     try{await ensureCands(item)}catch(e){G.phase='idle';setBtns();$('#ctext').textContent='Haku epäonnistui';msg(e.message);return}
-    if(!item.cands.length){msg(`Biisille "${item.song[0]} - ${item.song[1]}" ei löytynyt videota. Ohitetaan.`,true);skip();return}
+    if(!item.cands.length){msg(`Biisille "${label(item)}" ei löytynyt videota. Ohitetaan.`,true);skip();return}
     loadCurrent();
     prefetchNext();
   }else{
@@ -538,7 +602,7 @@ function onState(e){
     const item=cur();
     if(G.firstPlay){
       G.firstPlay=false;
-      vcache[key(item.song)]=item.cands[item.ci];ls.set('vcache',vcache);
+      if(!item.vid){vcache[key(item.song)]=item.cands[item.ci];ls.set('vcache',vcache)}
       // random start beyond the end of a short track: move it earlier
       const d=player.getDuration();
       if(settings.start==='rand' && d && G.startAt>d-settings.clip-3){G.startAt=Math.max(0,Math.floor(d*0.3));player.seekTo(G.startAt,true)}
@@ -571,27 +635,31 @@ function tick(){
 }
 function onYTError(e){
   if(!G) return;
+  if(G.cueWait){G.cueWait.fail();return}
   const item=cur();
-  if(e.data===153){msg('YouTuben soitin ei käynnisty tästä osoitteesta. Avaa peli GitHub Pagesin kautta, ei suoraan tiedostona.');G.phase='idle';setBtns();return}
+  if(!item) return;
+  if(e.data===153){msg('YouTuben soitin ei käynnisty tästä osoitteesta. Avaa peli verkko-osoitteen kautta, ei suoraan tiedostona.');G.phase='idle';setBtns();return}
   // try the next search result
-  delete vcache[key(item.song)];ls.set('vcache',vcache);
+  if(!item.vid){delete vcache[key(item.song)];ls.set('vcache',vcache)}
   if(item.cands && item.ci<item.cands.length-1){item.ci++;loadCurrent();return}
-  msg(`Biisiä "${item.song[0]} - ${item.song[1]}" ei voitu soittaa. Ohitetaan.`,true);skip();
+  msg(`Biisiä "${label(item)}" ei voitu soittaa. Ohitetaan.`,true);skip();
 }
 
 function reveal(){
-  const s=cur().song;
+  const item=cur();
+  if(item.vid){try{item.song=parseVideo(player.getVideoData())}catch(e){item.song=['','','']}}
+  const s=item.song;
   G.clipEnd=null;G.phase='revealed';setBtns();
   $('#curtain').classList.add('up');$('#curtain').classList.remove('playing');$('#bar').style.width='0';
   $('#rArtist').textContent=s[0];$('#rTitle').textContent=s[1];$('#rYear').textContent=s[2]||'';
   $('#reveal').hidden=false;
   try{player.playVideo()}catch(e){}
-  markPlayed(s);renderScore();
+  markPlayed(item);renderScore();
 }
-function markPlayed(s){
-  const p=ls.get('played.'+G.catId,[]);if(!p.includes(key(s))){p.push(key(s));ls.set('played.'+G.catId,p)}
+function markPlayed(item){
+  const k=itemKey(item);const p=ls.get('played.'+G.catId,[]);if(!p.includes(k)){p.push(k);ls.set('played.'+G.catId,p)}
 }
-function skip(){markPlayed(cur().song);nextSong()}
+function skip(){const it=cur();if(it)markPlayed(it);nextSong()}
 
 function gainFor(m){if(!m)return 0;if(m.band&&m.song)return settings.both;if(m.band)return settings.band;if(m.song)return settings.song;return 0}
 function renderScore(){
