@@ -18,6 +18,7 @@
   color-scheme:dark;
 }
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 html,body{margin:0}
 body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:17px;line-height:1.45;
   padding-left:max(16px, env(safe-area-inset-left,0px));padding-right:max(16px, env(safe-area-inset-right,0px));
@@ -152,8 +153,12 @@ code{background:var(--bg);padding:1px 6px;border-radius:4px;border:1px solid var
       <summary>YouTube-avain ja asetukset</summary>
       <p class="sub">Peli etsii jokaiselle biisille videon YouTubesta. Siihen tarvitaan ilmainen YouTube Data API -avain. Avain tallentuu vain tähän selaimeen.</p>
       <label class="f">YouTube Data API -avain
-        <input id="apiKey" type="text" placeholder="AIza..." autocomplete="off" spellcheck="false">
+        <div class="row" style="flex-wrap:nowrap">
+          <input id="apiKey" type="password" placeholder="Liitä avain tähän" autocomplete="off" spellcheck="false" style="flex:1">
+          <button class="ghost" id="showKey" type="button">Näytä</button>
+        </div>
       </label>
+      <p class="sub" id="keyState" style="margin:0"></p>
       <p class="sub" id="cacheInfo"></p>
       <div class="row"><button class="ghost" id="resetPlayed">Nollaa soitetut biisit</button><button class="ghost" id="clearCache">Tyhjennä videomuisti</button></div>
     </details>
@@ -359,6 +364,7 @@ function bindSettings(){
   for(const [id,k] of Object.entries(map)){const el=$('#'+id);el.value=settings[k];el.onchange=()=>{settings[k]=(k==='start')?el.value:Math.max(0,+el.value||0);save()}}
   $('#apiKey').value=apiKey;
   $('#apiKey').oninput=e=>{apiKey=e.target.value.trim();ls.set('apiKey',apiKey);updateStartInfo()};
+  $('#showKey').onclick=()=>{const el=$('#apiKey');const vis=el.type==='text';el.type=vis?'password':'text';$('#showKey').textContent=vis?'Näytä':'Piilota'};
   $('#addP').onclick=()=>{settings.players.push('Pelaaja '+(settings.players.length+1));save();renderPlayers()};
   $('#resetPlayed').onclick=()=>{Object.keys(allCats()).forEach(id=>ls.set('played.'+id,[]));renderCats()};
   $('#clearCache').onclick=()=>{vcache={};ls.set('vcache',vcache);updateCacheInfo()};
@@ -383,6 +389,7 @@ function updateCacheInfo(){$('#cacheInfo').textContent=`Videomuistissa ${Object.
 function updateStartInfo(){
   $('#startInfo').textContent = apiKey?'':'Lisää ensin YouTube-avain alta.';
   $('#startBtn').disabled=!apiKey;
+  $('#keyState').textContent = apiKey?`Avain tallennettu tähän selaimeen (päättyy …${apiKey.slice(-4)}).`:'';
   if(!apiKey) $('#keyBox').open=true;
 }
 function checkProtocol(){
