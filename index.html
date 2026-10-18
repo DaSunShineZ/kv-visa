@@ -1,0 +1,632 @@
+<!doctype html>
+<html lang="fi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Riffivisa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pirata+One&family=Barlow+Semi+Condensed:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: a single stage column; the hidden player sits under a "curtain", scoreboard below it. */
+:root{
+  --bg:#16110e; --panel:#211915; --panel-2:#2b211c; --line:#3d2f28;
+  --fg:#f2e7dc; --muted:#a99486; --amber:#e9a23b; --amber-dim:#7a5523;
+  --ember:#c8442f; --good:#7fb069;
+  --display:"Pirata One", "UnifrakturCook", Georgia, serif;
+  --body:"Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:17px;line-height:1.45;
+  padding-left:max(16px, env(safe-area-inset-left,0px));padding-right:max(16px, env(safe-area-inset-right,0px));
+  padding-block:24px 48px;min-height:100vh;
+  background-image:radial-gradient(ellipse 70% 40% at 50% 0%, rgba(233,162,59,.13), transparent 70%);}
+.wrap{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+h1{font-family:var(--display);font-weight:400;font-size:clamp(48px,11vw,84px);line-height:.9;margin:0;letter-spacing:.01em;color:var(--fg);text-wrap:balance}
+h1 span{color:var(--amber)}
+h2{font-family:var(--display);font-weight:400;font-size:30px;margin:0;color:var(--amber);letter-spacing:.02em}
+.tag{font-size:13px;text-transform:uppercase;letter-spacing:.14em;color:var(--muted);font-weight:600}
+.sub{color:var(--muted);margin:6px 0 0;max-width:60ch}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px;display:flex;flex-direction:column;gap:14px}
+button{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--panel-2);color:var(--fg);border-radius:8px;padding:10px 16px;font-weight:600;transition:background .15s,border-color .15s,transform .05s}
+button:hover{border-color:var(--amber-dim)}
+button:active{transform:translateY(1px)}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+button.primary{background:var(--amber);color:#1c1208;border-color:var(--amber);font-size:19px;padding:14px 22px}
+button.primary:hover{background:#f3b354}
+button.ghost{background:transparent}
+button:disabled{opacity:.45;cursor:not-allowed}
+input,select,textarea{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 12px;min-width:0}
+textarea{width:100%;min-height:140px;font-size:15px;resize:vertical}
+label.f{display:flex;flex-direction:column;gap:6px;font-size:14px;color:var(--muted);font-weight:600}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+
+/* category picker */
+.cats{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
+.cat{text-align:left;padding:14px;display:flex;flex-direction:column;gap:2px;background:var(--bg)}
+.cat b{font-family:var(--display);font-weight:400;font-size:30px;line-height:1;color:var(--fg)}
+.cat small{color:var(--muted);font-weight:500}
+.cat[aria-pressed="true"]{border-color:var(--amber);background:linear-gradient(180deg,rgba(233,162,59,.16),transparent)}
+.cat[aria-pressed="true"] b{color:var(--amber)}
+
+/* players */
+.plist{display:flex;flex-direction:column;gap:8px}
+.plist .row input{flex:1}
+
+/* stage */
+.stage{position:relative;aspect-ratio:16/9;max-width:100%;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:#000}
+#ytHost,#ytHost iframe{position:absolute;inset:0;width:100%;height:100%}
+.curtain{position:absolute;inset:0;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+  background:repeating-linear-gradient(90deg,#2a1714 0 22px,#331c18 22px 44px);transition:transform .7s cubic-bezier(.7,0,.2,1);
+  pointer-events:none}
+.curtain.up{transform:translateY(-101%)}
+.eq{display:flex;gap:6px;align-items:flex-end;height:64px}
+.eq i{width:10px;background:var(--amber);border-radius:2px;height:12%;transition:height .2s}
+.playing .eq i{animation:bounce .9s ease-in-out infinite}
+.eq i:nth-child(2){animation-delay:-.3s}.eq i:nth-child(3){animation-delay:-.6s}.eq i:nth-child(4){animation-delay:-.15s}.eq i:nth-child(5){animation-delay:-.45s}.eq i:nth-child(6){animation-delay:-.75s}
+@keyframes bounce{0%,100%{height:15%}50%{height:100%}}
+.count{font-family:var(--display);font-size:64px;line-height:1;color:var(--fg);font-variant-numeric:tabular-nums}
+.ctext{color:var(--muted);font-weight:600;letter-spacing:.08em;text-transform:uppercase;font-size:14px;text-align:center;padding:0 12px}
+.bar{position:absolute;left:0;bottom:0;height:5px;background:var(--amber);width:0;z-index:3}
+
+.reveal{display:flex;flex-direction:column;gap:2px}
+.reveal .artist{font-family:var(--display);font-size:40px;line-height:1;color:var(--amber)}
+.reveal .title{font-size:24px;font-weight:600}
+.reveal .year{color:var(--muted);font-variant-numeric:tabular-nums}
+
+/* scoring */
+.score{display:flex;flex-direction:column;gap:8px}
+.prow{display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+.prow .nm{font-weight:700;font-size:19px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prow .pts{font-family:var(--display);font-size:32px;line-height:1;color:var(--amber);font-variant-numeric:tabular-nums;min-width:2ch;text-align:right}
+.chip{padding:8px 12px;border-radius:999px;font-size:15px}
+.chip[aria-pressed="true"]{background:var(--good);border-color:var(--good);color:#0f1a0a}
+.chip:disabled{opacity:.3}
+.gain{color:var(--good);font-weight:700;font-size:14px;min-width:3ch}
+
+.top{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.msg{padding:12px 14px;border-radius:8px;border:1px solid var(--ember);background:rgba(200,68,47,.12);color:var(--fg)}
+.msg.info{border-color:var(--amber-dim);background:rgba(233,162,59,.08)}
+details{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 18px}
+details summary{cursor:pointer;font-weight:700}
+details ol,details ul{padding-left:20px;margin:10px 0}
+details li{margin:6px 0}
+code{background:var(--bg);padding:1px 6px;border-radius:4px;border:1px solid var(--line);font-size:.9em;word-break:break-all}
+.winner{font-family:var(--display);font-size:clamp(44px,10vw,72px);line-height:1;color:var(--amber);text-wrap:balance}
+.foot{color:var(--muted);font-size:13px;text-align:center}
+@media (max-width:480px){.prow{grid-template-columns:1fr auto;}.prow .chips{grid-column:1/-1;display:flex;gap:8px}}
+@media (prefers-reduced-motion:reduce){.playing .eq i{animation:none;height:60%}.curtain{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="tag">Arvaa bändi, arvaa biisi</div>
+    <h1>Riffi<span>visa</span></h1>
+  </header>
+
+  <!-- SETUP -->
+  <section id="setup" class="wrap" style="gap:18px">
+    <div id="warn"></div>
+
+    <div class="panel">
+      <h2>Lista</h2>
+      <div class="cats" id="cats"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Pelaajat</h2>
+      <div class="plist" id="plist"></div>
+      <div class="row"><button class="ghost" id="addP">+ Lisää pelaaja</button></div>
+    </div>
+
+    <div class="panel">
+      <h2>Säännöt</h2>
+      <div class="grid2">
+        <label class="f">Soittoaika
+          <select id="sClip"><option value="5">5 s</option><option value="10">10 s</option><option value="15">15 s</option><option value="20">20 s</option><option value="30">30 s</option></select>
+        </label>
+        <label class="f">Biisejä pelissä
+          <select id="sCount"><option>5</option><option>10</option><option>15</option><option>20</option><option>30</option></select>
+        </label>
+        <label class="f">Aloituskohta
+          <select id="sStart"><option value="rand">Satunnainen kohta</option><option value="intro">Alusta</option></select>
+        </label>
+        <label class="f">Pisteet: bändi / biisi / molemmat
+          <div class="row" style="gap:6px;flex-wrap:nowrap">
+            <input id="pBand" type="number" min="0" value="1" style="width:4.2em">
+            <input id="pSong" type="number" min="0" value="1" style="width:4.2em">
+            <input id="pBoth" type="number" min="0" value="3" style="width:4.2em">
+          </div>
+        </label>
+      </div>
+    </div>
+
+    <div class="row"><button class="primary" id="startBtn">Aloita peli</button><span id="startInfo" class="sub" style="margin:0"></span></div>
+
+    <details id="keyBox">
+      <summary>YouTube-avain ja asetukset</summary>
+      <p class="sub">Peli etsii jokaiselle biisille videon YouTubesta. Siihen tarvitaan ilmainen YouTube Data API -avain. Avain tallentuu vain tähän selaimeen.</p>
+      <label class="f">YouTube Data API -avain
+        <input id="apiKey" type="text" placeholder="AIza..." autocomplete="off" spellcheck="false">
+      </label>
+      <p class="sub" id="cacheInfo"></p>
+      <div class="row"><button class="ghost" id="resetPlayed">Nollaa soitetut biisit</button><button class="ghost" id="clearCache">Tyhjennä videomuisti</button></div>
+    </details>
+
+    <details>
+      <summary>Omat listat</summary>
+      <p class="sub">Liitä lista, yksi biisi per rivi muodossa <code>Bändi - Biisi - Vuosi</code>. Vuosi on vapaaehtoinen. Pyydä Claudelta uusi genre tässä muodossa ja liitä se tähän.</p>
+      <label class="f">Listan nimi <input id="cName" type="text" placeholder="Esim. Suomimetalli 2000"></label>
+      <label class="f">Biisit <textarea id="cText" placeholder="Nightwish - Nemo - 2004&#10;Children of Bodom - Hate Me! - 2000"></textarea></label>
+      <div class="row"><button id="cSave">Tallenna lista</button><span id="cMsg" class="sub" style="margin:0"></span></div>
+      <div id="cList" class="row"></div>
+    </details>
+
+    <details>
+      <summary>Käyttöönotto-ohjeet</summary>
+      <ol>
+        <li><b>YouTube-avain:</b> mene osoitteeseen <code>console.cloud.google.com</code>, luo uusi projekti, ota käyttöön <i>YouTube Data API v3</i> (APIs &amp; Services → Library) ja luo avain kohdassa Credentials → Create credentials → API key. Liitä avain yllä olevaan kenttään. Ilmainen kiintiö riittää noin 100 biisihakuun päivässä. Löydetyt videot muistetaan, joten sama biisi ei kuluta kiintiötä uudestaan.</li>
+        <li><b>Pelin osoite:</b> YouTuben soitin ei toimi, jos tämä tiedosto avataan suoraan koneelta (osoite alkaa <code>file://</code>). Helpoin ilmainen tapa on GitHub Pages: luo GitHubiin uusi julkinen repo, lataa tämä tiedosto sinne nimellä <code>index.html</code> ja ota käyttöön Settings → Pages → Branch: main. Peli aukeaa osoitteesta <code>käyttäjänimi.github.io/reponimi</code>.</li>
+        <li><b>Suojaa avain:</b> rajaa avain Google Cloudissa kohdassa Application restrictions → Websites osoitteeseen <code>https://käyttäjänimi.github.io/*</code>, niin muut eivät voi käyttää sitä.</li>
+        <li><b>Premium:</b> kirjaudu samassa selaimessa YouTubeen Premium-tililläsi, niin mainokset eivät keskeytä kierroksia.</li>
+        <li><b>Televisioon:</b> Androidissa avaa Google Home → Chromecast → Cast my screen. Laita Älä häiritse päälle äläkä vedä ilmoituspalkkia alas kierroksen aikana, koska mediaohjain näyttää videon nimen.</li>
+        <li><b>Jos biisi ei ala soida</b> puhelimella, napauta verhoa. Video pysyy piilossa.</li>
+      </ol>
+    </details>
+  </section>
+
+  <!-- GAME -->
+  <section id="game" class="wrap" hidden style="gap:16px">
+    <div class="top">
+      <div><div class="tag" id="gCat"></div><h2 id="gNum" style="color:var(--fg)"></h2></div>
+      <div class="row"><button class="ghost" id="undoBtn" disabled>Peru edellinen</button><button class="ghost" id="quitBtn">Lopeta</button></div>
+    </div>
+
+    <div class="stage" id="stage">
+      <div id="ytHost"></div>
+      <div class="curtain" id="curtain">
+        <div class="eq"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="count" id="count"></div>
+        <div class="ctext" id="ctext">Paina Soita</div>
+      </div>
+      <div class="bar" id="bar"></div>
+    </div>
+
+    <div id="gMsg"></div>
+
+    <div class="row" id="ctrls">
+      <button class="primary" id="playBtn">Soita</button>
+      <button id="moreBtn" disabled>+5 s</button>
+      <button id="revealBtn" disabled>Paljasta</button>
+      <button class="ghost" id="skipBtn">Ohita biisi</button>
+    </div>
+
+    <div class="reveal" id="reveal" hidden>
+      <div class="artist" id="rArtist"></div>
+      <div class="title" id="rTitle"></div>
+      <div class="year" id="rYear"></div>
+    </div>
+
+    <div class="panel">
+      <div class="row" style="justify-content:space-between"><h2>Pisteet</h2><span class="sub" style="margin:0" id="ruleTxt"></span></div>
+      <div class="score" id="score"></div>
+    </div>
+
+    <div class="row"><button class="primary" id="nextBtn" disabled>Seuraava biisi</button></div>
+  </section>
+
+  <!-- END -->
+  <section id="end" class="wrap" hidden style="gap:18px">
+    <div class="panel" style="gap:10px">
+      <div class="tag">Peli päättyi</div>
+      <div class="winner" id="winner"></div>
+      <div class="score" id="final"></div>
+    </div>
+    <div class="row"><button class="primary" id="againBtn">Uusi peli</button><button id="backBtn">Asetuksiin</button></div>
+  </section>
+
+  <div class="foot">Valmiit listat: Claude. Videot: YouTube.</div>
+</div>
+
+<script>
+/* ---------- Song lists: [artist, title, year] ---------- */
+const BUILTIN = {
+m1990:{name:"1990",desc:"Metalli 1990-luku",songs:[
+["Metallica","Enter Sandman",1991],["Metallica","The Unforgiven",1991],["Metallica","Nothing Else Matters",1991],["Metallica","Wherever I May Roam",1991],["Metallica","Until It Sleeps",1996],["Metallica","Fuel",1997],
+["Pantera","Cowboys from Hell",1990],["Pantera","Cemetery Gates",1990],["Pantera","Walk",1992],["Pantera","I'm Broken",1994],
+["Megadeth","Holy Wars... The Punishment Due",1990],["Megadeth","Hangar 18",1990],["Megadeth","Symphony of Destruction",1992],["Megadeth","A Tout le Monde",1994],
+["Slayer","Seasons in the Abyss",1990],["Slayer","War Ensemble",1990],["Sepultura","Refuse/Resist",1993],["Sepultura","Roots Bloody Roots",1996],
+["Iron Maiden","Bring Your Daughter... to the Slaughter",1990],["Iron Maiden","Fear of the Dark",1992],["Judas Priest","Painkiller",1990],
+["Ozzy Osbourne","No More Tears",1991],["Ozzy Osbourne","Mama, I'm Coming Home",1991],["Motörhead","I Ain't No Nice Guy",1991],
+["Alice in Chains","Man in the Box",1990],["Alice in Chains","Would?",1992],["Alice in Chains","Rooster",1992],["Soundgarden","Black Hole Sun",1994],["Soundgarden","Spoonman",1994],
+["Skid Row","Slave to the Grind",1991],["Skid Row","Monkey Business",1991],["Faith No More","Midlife Crisis",1992],["Ministry","Jesus Built My Hotrod",1991],
+["White Zombie","Thunder Kiss '65",1992],["Rob Zombie","Dragula",1998],["Rage Against the Machine","Killing in the Name",1992],["Biohazard","Punishment",1992],
+["Korn","Blind",1994],["Korn","Freak on a Leash",1998],["Korn","Got the Life",1998],["Deftones","My Own Summer (Shove It)",1997],["Deftones","Be Quiet and Drive (Far Away)",1997],
+["System of a Down","Sugar",1998],["Limp Bizkit","Nookie",1999],["Slipknot","Wait and Bleed",1999],["Slipknot","Spit It Out",1999],["Static-X","Push It",1999],
+["Coal Chamber","Loco",1997],["Godsmack","Whatever",1998],["Powerman 5000","When Worlds Collide",1999],
+["Marilyn Manson","The Beautiful People",1996],["Marilyn Manson","The Dope Show",1998],["Nine Inch Nails","Closer",1994],["Rammstein","Du hast",1997],["Rammstein","Engel",1997],
+["Type O Negative","Black No. 1",1993],["Type O Negative","Love You to Death",1996],["Machine Head","Davidian",1994],["Machine Head","Old",1994],["Fear Factory","Replica",1995],
+["Tool","Sober",1993],["Tool","Forty Six & 2",1996],["Dream Theater","Pull Me Under",1992],["Kyuss","Green Machine",1992],
+["Blind Guardian","The Bard's Song - In the Forest",1992],["Helloween","Power",1996],["Stratovarius","Black Diamond",1997],
+["Nightwish","Sacrament of Wilderness",1998],["Nightwish","Sleeping Sun",1999],["Children of Bodom","Downfall",1999],["Amorphis","Black Winter Day",1994],
+["Sentenced","Noose",1996],["HIM","Wicked Game",1996],["HIM","Join Me in Death",1999],["In Flames","Episode 666",1999],["At the Gates","Blinded by Fear",1995],
+["Entombed","Wolverine Blues",1993],["Cannibal Corpse","Hammer Smashed Face",1992],["Death","Crystal Mountain",1995],["Paradise Lost","As I Die",1992],
+["Moonspell","Opium",1996],["Therion","To Mega Therion",1996],["Emperor","I Am the Black Wizards",1994],["Dimmu Borgir","Mourning Palace",1997],["Cradle of Filth","Dusk and Her Embrace",1996]
+]},
+m2000:{name:"2000",desc:"Metalli 2000-luku",songs:[
+["System of a Down","Chop Suey!",2001],["System of a Down","Toxicity",2001],["System of a Down","Aerials",2001],["System of a Down","B.Y.O.B.",2005],
+["Slipknot","People = Shit",2001],["Slipknot","Left Behind",2001],["Slipknot","Duality",2004],["Slipknot","Before I Forget",2004],["Slipknot","Psychosocial",2008],
+["Disturbed","Down with the Sickness",2000],["Disturbed","Stricken",2005],["Disturbed","Indestructible",2008],["Drowning Pool","Bodies",2001],["Mudvayne","Dig",2000],["Mudvayne","Happy?",2005],
+["Linkin Park","One Step Closer",2000],["Linkin Park","Faint",2003],["Papa Roach","Last Resort",2000],["Deftones","Change (In the House of Flies)",2000],["Korn","Here to Stay",2002],["Korn","Coming Undone",2005],
+["Godsmack","I Stand Alone",2002],["Chevelle","The Red",2002],["Static-X","The Only",2003],["Evanescence","Bring Me to Life",2003],
+["Rammstein","Ich will",2001],["Rammstein","Sonne",2001],["Rammstein","Links 2 3 4",2001],["Rammstein","Mein Teil",2004],["Rammstein","Amerika",2004],
+["Metallica","St. Anger",2003],["Metallica","The Day That Never Comes",2008],["Metallica","All Nightmare Long",2008],["Iron Maiden","The Wicker Man",2000],["Megadeth","Washington Is Next!",2007],
+["Tool","Schism",2001],["Tool","Vicarious",2006],["Mastodon","Blood and Thunder",2004],["Mastodon","Oblivion",2009],["Gojira","Oroborus",2008],["Opeth","Ghost of Perdition",2005],
+["Lamb of God","Laid to Rest",2004],["Lamb of God","Redneck",2006],["Machine Head","Halo",2007],["Trivium","Pull Harder on the Strings of Your Martyr",2005],
+["Killswitch Engage","My Last Serenade",2002],["Killswitch Engage","The End of Heartache",2004],["Killswitch Engage","My Curse",2006],["As I Lay Dying","Confined",2005],["Atreyu","Ex's and Oh's",2004],
+["Bullet for My Valentine","Tears Don't Fall",2005],["Bullet for My Valentine","Scream Aim Fire",2008],["Avenged Sevenfold","Bat Country",2005],["Avenged Sevenfold","Beast and the Harlot",2005],["Avenged Sevenfold","Afterlife",2007],
+["Five Finger Death Punch","The Bleeding",2007],["Black Label Society","Stillborn",2003],["DevilDriver","Clouds Over California",2007],["Bring Me the Horizon","Chelsea Smile",2008],
+["Children of Bodom","Hate Me!",2000],["Children of Bodom","Needled 24/7",2003],["Children of Bodom","In Your Face",2005],["Children of Bodom","Blooddrunk",2008],
+["Nightwish","Ever Dream",2002],["Nightwish","Nemo",2004],["Nightwish","Wish I Had an Angel",2004],["Nightwish","Amaranth",2007],
+["Lordi","Would You Love a Monsterman?",2002],["Lordi","Hard Rock Hallelujah",2006],["HIM","Right Here in My Arms",2000],["HIM","Wings of a Butterfly",2005],
+["Amorphis","House of Sleep",2006],["Sonata Arctica","Don't Say a Word",2004],["Ensiferum","Lai Lai Hei",2004],["Turisas","Battle Metal",2004],["Korpiklaani","Vodka",2009],["Apocalyptica","I'm Not Jesus",2006],
+["In Flames","Only for the Weak",2000],["In Flames","The Quiet Place",2004],["Soilwork","Stabbing the Drama",2005],["Arch Enemy","We Will Rise",2003],["Arch Enemy","Nemesis",2005],
+["Amon Amarth","Pursuit of Vikings",2004],["Amon Amarth","Twilight of the Thunder God",2008],["DragonForce","Through the Fire and Flames",2006],
+["Within Temptation","Ice Queen",2001],["Within Temptation","What Have You Done",2007],["Behemoth","Conquer All",2004],["Dimmu Borgir","Progenies of the Great Apocalypse",2003],["Cradle of Filth","Nymphetamine",2004]
+]},
+m2010:{name:"2010",desc:"Metalli 2010-luku",songs:[
+["Ghost","Year Zero",2013],["Ghost","Cirice",2015],["Ghost","Square Hammer",2016],["Ghost","Rats",2018],["Ghost","Dance Macabre",2018],
+["Gojira","L'Enfant Sauvage",2012],["Gojira","Stranded",2016],["Gojira","Silvera",2016],["Mastodon","Curl of the Burl",2011],["Mastodon","High Road",2014],["Mastodon","Show Yourself",2017],
+["Avenged Sevenfold","Nightmare",2010],["Avenged Sevenfold","Hail to the King",2013],["Avenged Sevenfold","The Stage",2016],
+["Five Finger Death Punch","Lift Me Up",2013],["Five Finger Death Punch","Wrong Side of Heaven",2013],["Disturbed","The Vengeful One",2015],["Disturbed","The Sound of Silence",2015],
+["Slipknot","The Devil in I",2014],["Slipknot","Custer",2014],["Slipknot","All Out Life",2018],["Slipknot","Unsainted",2019],
+["Metallica","Hardwired",2016],["Metallica","Moth Into Flame",2016],["Megadeth","Dystopia",2016],["Iron Maiden","Speed of Light",2015],["Machine Head","Locust",2011],
+["Rammstein","Mein Land",2011],["Rammstein","Deutschland",2019],["Rammstein","Radio",2019],
+["Sabaton","Carolus Rex",2012],["Sabaton","Night Witches",2014],["Sabaton","The Last Stand",2016],["Sabaton","Bismarck",2019],
+["Powerwolf","Army of the Night",2015],["Powerwolf","Demons Are a Girl's Best Friend",2018],["Amon Amarth","Deceiver of the Gods",2013],["Amon Amarth","First Kill",2016],["Amon Amarth","Raven's Flight",2019],
+["Arch Enemy","War Eternal",2014],["Arch Enemy","The Eagle Flies Alone",2017],["Behemoth","Blow Your Trumpets Gabriel",2013],
+["Nightwish","Storytime",2011],["Nightwish","Élan",2015],["Battle Beast","Black Ninja",2013],["Battle Beast","King for a Day",2015],["Beast in Black","Blind and Frozen",2017],
+["Children of Bodom","Was It Worth It?",2011],["Insomnium","While We Sleep",2014],["Wintersun","Time",2012],["Amaranthe","The Nexus",2013],["Amaranthe","Drop Dead Cynical",2014],
+["Babymetal","Megitsune",2013],["Babymetal","Gimme Chocolate!!",2014],
+["Bring Me the Horizon","Shadow Moses",2013],["Bring Me the Horizon","Can You Feel My Heart",2013],["Bring Me the Horizon","Throne",2015],
+["Architects","Gone with the Wind",2016],["Architects","Doomsday",2017],["Parkway Drive","Vice Grip",2015],["Parkway Drive","Prey",2018],["Of Mice & Men","You're Not Alone",2014],
+["Trivium","In Waves",2011],["Trivium","Silence in the Snow",2015],["Lamb of God","Ghost Walking",2012],["Lamb of God","512",2015],["Killswitch Engage","In Due Time",2013],
+["Volbeat","A Warrior's Call",2010],["Volbeat","Lola Montez",2013],["Avatar","Hail the Apocalypse",2014],["Avatar","The Eagle Has Landed",2016],
+["In This Moment","Blood",2012],["Jinjer","Pisces",2016],["Sleep Token","Alkaline",2019]
+]},
+m2020:{name:"2020",desc:"Metalli 2020-luku",songs:[
+["Spiritbox","Holy Roller",2020],["Spiritbox","Circle with Me",2021],["Spiritbox","Jaded",2023],["Spiritbox","Soft Spine",2024],
+["Sleep Token","The Summoning",2023],["Sleep Token","Granite",2023],["Sleep Token","Emergence",2025],
+["Ghost","Call Me Little Sunshine",2022],["Ghost","Kaisarion",2022],["Ghost","Spillways",2022],["Ghost","Satanized",2025],
+["Bring Me the Horizon","Parasite Eve",2020],["Bring Me the Horizon","Kingslayer",2021],["Bring Me the Horizon","Kool-Aid",2023],
+["Architects","Animals",2020],["Architects","Meteor",2021],["Gojira","Another World",2020],["Gojira","Born for One Thing",2021],["Gojira","Amazonia",2021],["Gojira","Mea Culpa (Ah! Ça ira!)",2024],
+["Mastodon","Pushing the Tides",2021],["Metallica","Lux Æterna",2022],["Metallica","Screaming Suicide",2023],["Metallica","72 Seasons",2023],["Megadeth","We'll Be Back",2022],
+["Iron Maiden","The Writing on the Wall",2021],["Iron Maiden","Stratego",2021],["Rammstein","Zeit",2022],["Rammstein","Zick Zack",2022],
+["Slipknot","The Chapeltown Rag",2021],["Slipknot","The Dying Song (Time to Sing)",2022],["Lorna Shore","To the Hellfire",2021],["Lorna Shore","Sun//Eater",2022],
+["Knocked Loose","Suffocate",2024],["Jinjer","Vortex",2021],["Jinjer","Judgement (& Punishment)",2021],
+["Electric Callboy","Hypa Hypa",2020],["Electric Callboy","Pump It",2021],["Electric Callboy","Spaceman",2021],["Electric Callboy","We Got the Moves",2022],
+["Babymetal","Metali!!",2023],["Babymetal","Ratatata",2024],["Nightwish","Noise",2020],["Nightwish","Harvest",2020],
+["Powerwolf","Dancing with the Dead",2021],["Sabaton","Steel Commanders",2022],["Sabaton","Christmas Truce",2022],["Beast in Black","One Night in Tokyo",2021],["Battle Beast","Master of Illusion",2022],
+["Avenged Sevenfold","Nobody",2023],["Avenged Sevenfold","We Love You",2023],["Five Finger Death Punch","Welcome to the Circus",2022],["Disturbed","Bad Man",2022],
+["Trivium","In the Court of the Dragon",2021],["Lamb of God","Checkmate",2020],["Lamb of God","Memento Mori",2020],["Amon Amarth","The Great Heathen Army",2022],
+["Arch Enemy","Deceiver, Deceiver",2021],["Arch Enemy","Handshake with Hell",2022],["Bad Omens","Just Pretend",2022],["Bad Omens","The Death of Peace of Mind",2022],
+["Falling in Reverse","Zombified",2022],["Falling in Reverse","Watch the World Burn",2023],["Avatar","Dance Devil Dance",2023],["Bloodywood","Gaddaar",2022]
+]}
+};
+
+/* ---------- storage helpers ---------- */
+const ls = {
+  get(k,d){try{const v=localStorage.getItem('riffivisa.'+k);return v==null?d:JSON.parse(v)}catch(e){return d}},
+  set(k,v){try{localStorage.setItem('riffivisa.'+k,JSON.stringify(v))}catch(e){}}
+};
+const $ = s=>document.querySelector(s);
+const esc = s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+let settings = Object.assign({cat:'m1990',clip:10,count:10,start:'rand',band:1,song:1,both:3,players:['Pelaaja 1','Pelaaja 2']}, ls.get('settings',{}));
+let customs = ls.get('customs',{});
+let apiKey = ls.get('apiKey','');
+let vcache = ls.get('vcache',{});
+
+function allCats(){return Object.assign({},BUILTIN,customs)}
+
+/* ---------- setup UI ---------- */
+function renderCats(){
+  const cats=allCats();
+  if(!cats[settings.cat]) settings.cat='m1990';
+  $('#cats').innerHTML = Object.entries(cats).map(([id,c])=>{
+    const played=(ls.get('played.'+id,[])).length;
+    return `<button class="cat" data-id="${id}" aria-pressed="${id===settings.cat}"><b>${esc(c.name)}</b><small>${esc(c.desc||'Oma lista')} · ${c.songs.length} biisiä${played?` · ${played} soitettu`:''}</small></button>`;
+  }).join('');
+  $('#cats').querySelectorAll('.cat').forEach(b=>b.onclick=()=>{settings.cat=b.dataset.id;save();renderCats()});
+}
+function renderPlayers(){
+  $('#plist').innerHTML = settings.players.map((p,i)=>`<div class="row"><input id="pl${i}" value="${esc(p)}" aria-label="Pelaajan ${i+1} nimi"><button class="ghost" data-del="${i}" ${settings.players.length<2?'disabled':''} aria-label="Poista pelaaja">Poista</button></div>`).join('');
+  settings.players.forEach((_,i)=>{$('#pl'+i).oninput=e=>{settings.players[i]=e.target.value;save()}});
+  $('#plist').querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{settings.players.splice(+b.dataset.del,1);save();renderPlayers()});
+}
+function renderCustoms(){
+  $('#cList').innerHTML = Object.entries(customs).map(([id,c])=>`<button class="ghost" data-cdel="${id}">Poista "${esc(c.name)}"</button>`).join('');
+  $('#cList').querySelectorAll('[data-cdel]').forEach(b=>b.onclick=()=>{delete customs[b.dataset.cdel];ls.set('customs',customs);renderCustoms();renderCats()});
+}
+function save(){ls.set('settings',settings)}
+function bindSettings(){
+  const map={sClip:'clip',sCount:'count',sStart:'start',pBand:'band',pSong:'song',pBoth:'both'};
+  for(const [id,k] of Object.entries(map)){const el=$('#'+id);el.value=settings[k];el.onchange=()=>{settings[k]=(k==='start')?el.value:Math.max(0,+el.value||0);save()}}
+  $('#apiKey').value=apiKey;
+  $('#apiKey').oninput=e=>{apiKey=e.target.value.trim();ls.set('apiKey',apiKey);updateStartInfo()};
+  $('#addP').onclick=()=>{settings.players.push('Pelaaja '+(settings.players.length+1));save();renderPlayers()};
+  $('#resetPlayed').onclick=()=>{Object.keys(allCats()).forEach(id=>ls.set('played.'+id,[]));renderCats()};
+  $('#clearCache').onclick=()=>{vcache={};ls.set('vcache',vcache);updateCacheInfo()};
+  $('#cSave').onclick=()=>{
+    const name=$('#cName').value.trim();
+    const songs=$('#cText').value.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{
+      const parts=l.split(/\s+[-–—]\s+/);
+      if(parts.length<2) return null;
+      let year=''; if(parts.length>2 && /^\d{4}$/.test(parts[parts.length-1])) year=+parts.pop();
+      return [parts[0],parts.slice(1).join(' - '),year];
+    }).filter(Boolean);
+    if(!name){$('#cMsg').textContent='Anna listalle nimi.';return}
+    if(songs.length<3){$('#cMsg').textContent='Listalta löytyi alle 3 biisiä. Tarkista muoto: Bändi - Biisi - Vuosi.';return}
+    const id='c_'+name.toLowerCase().replace(/[^a-z0-9åäö]+/g,'_');
+    customs[id]={name,desc:'Oma lista',songs};ls.set('customs',customs);
+    settings.cat=id;save();
+    $('#cMsg').textContent=`Tallennettu: ${songs.length} biisiä.`;$('#cName').value='';$('#cText').value='';
+    renderCustoms();renderCats();
+  };
+}
+function updateCacheInfo(){$('#cacheInfo').textContent=`Videomuistissa ${Object.keys(vcache).length} biisiä.`}
+function updateStartInfo(){
+  $('#startInfo').textContent = apiKey?'':'Lisää ensin YouTube-avain alta.';
+  $('#startBtn').disabled=!apiKey;
+  if(!apiKey) $('#keyBox').open=true;
+}
+function checkProtocol(){
+  if(location.protocol==='file:'){
+    $('#warn').innerHTML='<div class="msg">Avasit pelin suoraan tiedostona. YouTuben soitin ei yleensä toimi näin. Laita peli GitHub Pagesiin, ohjeet alla kohdassa Käyttöönotto-ohjeet.</div>';
+  }
+}
+
+/* ---------- YouTube ---------- */
+let player=null, ytReady=false, ytReadyWait=[];
+window.onYouTubeIframeAPIReady=()=>{ytReady=true;ytReadyWait.splice(0).forEach(f=>f())};
+(function(){const s=document.createElement('script');s.src='https://www.youtube.com/iframe_api';document.head.appendChild(s)})();
+function whenYT(){return new Promise(r=>ytReady?r():ytReadyWait.push(r))}
+
+function makePlayer(){
+  return new Promise(res=>{
+    if(player){res();return}
+    player=new YT.Player('ytHost',{
+      width:'100%',height:'100%',
+      playerVars:{controls:0,disablekb:1,rel:0,playsinline:1,iv_load_policy:3,fs:0,origin:location.origin},
+      events:{onReady:()=>res(),onStateChange:onState,onError:onYTError}
+    });
+  });
+}
+
+const key=s=>(s[0]+'|'+s[1]).toLowerCase();
+async function searchVideos(song){
+  const k=key(song);
+  if(vcache[k]) return [vcache[k]];
+  const q=`${song[0]} ${song[1]}`;
+  const url=`https://www.googleapis.com/youtube/v3/search?part=id&type=video&videoEmbeddable=true&maxResults=5&q=${encodeURIComponent(q)}&key=${encodeURIComponent(apiKey)}`;
+  const r=await fetch(url);
+  const j=await r.json();
+  if(j.error){
+    const reason=(j.error.errors&&j.error.errors[0]&&j.error.errors[0].reason)||'';
+    if(reason==='quotaExceeded'||reason==='dailyLimitExceeded') throw new Error('YouTuben päivittäinen hakukiintiö on käytetty. Muistissa olevat biisit toimivat yhä, uusia voi hakea huomenna.');
+    if(reason==='keyInvalid'||/API key not valid/i.test(j.error.message)) throw new Error('YouTube-avain ei kelpaa. Tarkista avain asetuksista.');
+    if(/referer|referrer/i.test(j.error.message)) throw new Error('Avain on rajattu toiseen osoitteeseen. Lisää tämän sivun osoite avaimen sallittuihin sivustoihin Google Cloudissa.');
+    throw new Error('YouTube-haku epäonnistui: '+j.error.message);
+  }
+  return (j.items||[]).map(i=>i.id.videoId).filter(Boolean);
+}
+
+/* ---------- game state ---------- */
+let G=null;
+function newGame(){
+  const cat=allCats()[settings.cat];
+  const names=settings.players.map(n=>n.trim()).filter(Boolean);
+  if(names.length===0){names.push('Pelaaja 1')}
+  let played=ls.get('played.'+settings.cat,[]);
+  let pool=cat.songs.filter(s=>!played.includes(key(s)));
+  if(pool.length<settings.count){played=[];ls.set('played.'+settings.cat,[]);pool=cat.songs.slice()}
+  pool=shuffle(pool).slice(0,settings.count);
+  G={cat,catId:settings.cat,players:names.map(n=>({name:n,score:0})),queue:pool.map(s=>({song:s,cands:null,ci:0})),idx:-1,history:[],marks:{},phase:'idle',startAt:0,pendingClip:0,clipEnd:null,clipTotal:0};
+}
+function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function cur(){return G.queue[G.idx]}
+
+async function ensureCands(item){
+  if(!item.cands){item.cands=await searchVideos(item.song);item.ci=0}
+  return item.cands;
+}
+function prefetchNext(){
+  const n=G.queue[G.idx+1];
+  if(n&&!n.cands) ensureCands(n).catch(()=>{});
+}
+
+function show(id){['setup','game','end'].forEach(s=>$('#'+s).hidden=(s!==id));window.scrollTo(0,0)}
+
+async function startGame(){
+  newGame();
+  show('game');
+  keepAwake();
+  $('#gCat').textContent=G.cat.desc||G.cat.name;
+  $('#ruleTxt').textContent=`Bändi ${settings.band} · Biisi ${settings.song} · Molemmat ${settings.both}`;
+  msg('');
+  await whenYT();
+  await makePlayer();
+  nextSong();
+}
+
+function nextSong(){
+  G.idx++;
+  if(G.idx>=G.queue.length){endGame();return}
+  G.marks={};G.phase='idle';G.clipEnd=null;G.pendingClip=0;
+  try{player.stopVideo()}catch(e){}
+  $('#gNum').textContent=`Biisi ${G.idx+1} / ${G.queue.length}`;
+  $('#curtain').classList.remove('up','playing');
+  $('#count').textContent='';$('#ctext').textContent='Paina Soita';$('#bar').style.width='0';
+  $('#reveal').hidden=true;
+  setBtns();renderScore();
+}
+
+function setBtns(){
+  const p=G.phase;
+  $('#playBtn').textContent = (p==='idle'||p==='loading')?'Soita':'Soita uudelleen';
+  $('#playBtn').disabled = p==='loading'||p==='playing';
+  $('#moreBtn').disabled = !(p==='paused');
+  $('#revealBtn').disabled = !(p==='paused'||p==='playing');
+  $('#nextBtn').disabled = p!=='revealed';
+  $('#nextBtn').textContent = G.idx>=G.queue.length-1?'Lopputulokset':'Seuraava biisi';
+  $('#undoBtn').disabled = G.history.length===0;
+}
+
+function msg(t,info){$('#gMsg').innerHTML=t?`<div class="msg${info?' info':''}">${esc(t)}</div>`:''}
+
+async function play(){
+  const item=cur();
+  if(G.phase==='idle'){
+    G.phase='loading';setBtns();$('#ctext').textContent='Haetaan biisiä…';msg('');
+    try{await ensureCands(item)}catch(e){G.phase='idle';setBtns();$('#ctext').textContent='Haku epäonnistui';msg(e.message);return}
+    if(!item.cands.length){msg(`Biisille "${item.song[0]} - ${item.song[1]}" ei löytynyt videota. Ohitetaan.`,true);skip();return}
+    loadCurrent();
+    prefetchNext();
+  }else{
+    // replay from the clip start
+    G.pendingClip=settings.clip;G.clipTotal=settings.clip;G.phase='playing';setBtns();
+    player.seekTo(G.startAt,true);player.playVideo();
+  }
+}
+function loadCurrent(){
+  const item=cur();
+  G.startAt = settings.start==='rand' ? 30+Math.floor(Math.random()*40) : 0;
+  G.pendingClip=settings.clip;G.clipTotal=settings.clip;G.phase='loading';G.firstPlay=true;
+  player.loadVideoById({videoId:item.cands[item.ci],startSeconds:G.startAt});
+  // phones sometimes block autoplay; the curtain lets taps through to the player
+  const myIdx=G.idx;
+  setTimeout(()=>{if(G&&G.idx===myIdx&&G.phase==='loading'){$('#ctext').textContent='Napauta verhoa, niin biisi alkaa'}},3500);
+}
+let wakeLock=null;
+async function keepAwake(){try{if('wakeLock' in navigator&&!wakeLock){wakeLock=await navigator.wakeLock.request('screen');wakeLock.addEventListener('release',()=>{wakeLock=null})}}catch(e){}}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&G&&!$('#game').hidden)keepAwake()});
+function more(){
+  G.pendingClip=5;G.clipTotal=5;G.phase='playing';setBtns();player.playVideo();
+}
+
+function onState(e){
+  if(!G) return;
+  if(e.data===YT.PlayerState.PLAYING){
+    const item=cur();
+    if(G.firstPlay){
+      G.firstPlay=false;
+      vcache[key(item.song)]=item.cands[item.ci];ls.set('vcache',vcache);
+      // random start beyond the end of a short track: move it earlier
+      const d=player.getDuration();
+      if(settings.start==='rand' && d && G.startAt>d-settings.clip-3){G.startAt=Math.max(0,Math.floor(d*0.3));player.seekTo(G.startAt,true)}
+    }
+    if(G.phase==='revealed') return;
+    // a stray tap on the hidden player outside a clip: stop it
+    if(G.phase==='paused' && G.pendingClip<=0 && !G.clipEnd){player.pauseVideo();return}
+    if(G.pendingClip>0){G.clipEnd=performance.now()+G.pendingClip*1000;G.pendingClip=0}
+    G.phase='playing';setBtns();
+    $('#curtain').classList.add('playing');$('#ctext').textContent='Kuuntele…';
+    tick();
+  }else if(e.data===YT.PlayerState.BUFFERING){
+    if(G.clipEnd){G.pendingClip=Math.max(0,(G.clipEnd-performance.now())/1000);G.clipEnd=null}
+    if(G.phase!=='revealed'){$('#curtain').classList.remove('playing');$('#ctext').textContent='Ladataan…'}
+  }else if(e.data===YT.PlayerState.ENDED){
+    if(G.phase!=='revealed'){G.clipEnd=null;G.phase='paused';setBtns();$('#curtain').classList.remove('playing');$('#ctext').textContent='Biisi loppui';}
+  }
+}
+function tick(){
+  if(!G||!G.clipEnd||G.phase!=='playing') return;
+  const left=(G.clipEnd-performance.now())/1000;
+  if(left<=0){
+    G.clipEnd=null;player.pauseVideo();G.phase='paused';setBtns();
+    $('#curtain').classList.remove('playing');$('#count').textContent='';$('#ctext').textContent='Kuka tietää?';$('#bar').style.width='100%';
+    return;
+  }
+  $('#count').textContent=Math.ceil(left);
+  $('#bar').style.width=(100*(1-left/G.clipTotal))+'%';
+  requestAnimationFrame(tick);
+}
+function onYTError(e){
+  if(!G) return;
+  const item=cur();
+  if(e.data===153){msg('YouTuben soitin ei käynnisty tästä osoitteesta. Avaa peli GitHub Pagesin kautta, ei suoraan tiedostona.');G.phase='idle';setBtns();return}
+  // try the next search result
+  delete vcache[key(item.song)];ls.set('vcache',vcache);
+  if(item.cands && item.ci<item.cands.length-1){item.ci++;loadCurrent();return}
+  msg(`Biisiä "${item.song[0]} - ${item.song[1]}" ei voitu soittaa. Ohitetaan.`,true);skip();
+}
+
+function reveal(){
+  const s=cur().song;
+  G.clipEnd=null;G.phase='revealed';setBtns();
+  $('#curtain').classList.add('up');$('#curtain').classList.remove('playing');$('#bar').style.width='0';
+  $('#rArtist').textContent=s[0];$('#rTitle').textContent=s[1];$('#rYear').textContent=s[2]||'';
+  $('#reveal').hidden=false;
+  try{player.playVideo()}catch(e){}
+  markPlayed(s);renderScore();
+}
+function markPlayed(s){
+  const p=ls.get('played.'+G.catId,[]);if(!p.includes(key(s))){p.push(key(s));ls.set('played.'+G.catId,p)}
+}
+function skip(){markPlayed(cur().song);nextSong()}
+
+function gainFor(m){if(!m)return 0;if(m.band&&m.song)return settings.both;if(m.band)return settings.band;if(m.song)return settings.song;return 0}
+function renderScore(){
+  const can=G.phase==='revealed';
+  $('#score').innerHTML=G.players.map((p,i)=>{
+    const m=G.marks[i]||{};const g=gainFor(m);
+    return `<div class="prow"><div class="nm">${esc(p.name)}</div>
+      <div class="chips row" style="gap:8px"><button class="chip" data-p="${i}" data-k="band" aria-pressed="${!!m.band}" ${can?'':'disabled'}>Bändi</button><button class="chip" data-p="${i}" data-k="song" aria-pressed="${!!m.song}" ${can?'':'disabled'}>Biisi</button></div>
+      <div class="gain">${g?'+'+g:''}</div><div class="pts">${p.score}</div></div>`;
+  }).join('');
+  $('#score').querySelectorAll('.chip').forEach(b=>b.onclick=()=>{
+    const i=+b.dataset.p,k=b.dataset.k;G.marks[i]=G.marks[i]||{};G.marks[i][k]=!G.marks[i][k];renderScore();
+  });
+}
+function applyAndNext(){
+  const gains=G.players.map((_,i)=>gainFor(G.marks[i]));
+  gains.forEach((g,i)=>G.players[i].score+=g);
+  G.history.push({gains,idx:G.idx});
+  nextSong();
+}
+function undo(){
+  const h=G.history.pop();if(!h)return;
+  h.gains.forEach((g,i)=>G.players[i].score-=g);
+  renderScore();setBtns();
+  msg(`Biisin ${h.idx+1} pisteet peruttu.`,true);
+}
+function endGame(){
+  try{player.stopVideo()}catch(e){}
+  const ranked=G.players.slice().sort((a,b)=>b.score-a.score);
+  const top=ranked[0].score;const winners=ranked.filter(p=>p.score===top);
+  $('#winner').textContent= winners.length>1?'Tasapeli!':`${winners[0].name} voitti!`;
+  $('#final').innerHTML=ranked.map(p=>`<div class="prow" style="grid-template-columns:1fr auto"><div class="nm">${esc(p.name)}</div><div class="pts">${p.score}</div></div>`).join('');
+  show('end');renderCats();
+}
+
+/* ---------- wiring ---------- */
+$('#startBtn').onclick=startGame;
+$('#playBtn').onclick=play;
+$('#moreBtn').onclick=more;
+$('#revealBtn').onclick=reveal;
+$('#skipBtn').onclick=skip;
+$('#nextBtn').onclick=applyAndNext;
+$('#undoBtn').onclick=undo;
+$('#quitBtn').onclick=()=>{endGame()};
+$('#againBtn').onclick=startGame;
+$('#backBtn').onclick=()=>{show('setup');renderCats()};
+
+renderCats();renderPlayers();renderCustoms();bindSettings();updateCacheInfo();updateStartInfo();checkProtocol();
+</script>
+</body>
+</html>
